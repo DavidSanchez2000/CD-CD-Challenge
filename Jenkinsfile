@@ -1,5 +1,5 @@
 pipeline {
-   agent any
+   agent {label "host"}
    environment {
        dockerHub = "docker.io"
        docker_cred = 'dockerhub'
@@ -13,7 +13,7 @@ pipeline {
 		stage("Build Docker Image"){
 			steps{
 				sh 'pwd'
-				sh "docker build -t davidsanchez21/server_minecraft ."
+				sh "docker build -t davidsanchez21/server_minecraft . --no-cache"
 			}
 		}
 		stage('Upload Image to DockerHub'){
@@ -21,7 +21,8 @@ pipeline {
 	     	    withCredentials([
      		 	[$class: 'UsernamePasswordMultiBinding', credentialsId: docker_cred, usernameVariable: 'dockeruser', passwordVariable: 'dockerpass'],
   				]){
-					sh "docker login -u ${dockeruser} -p ${dockerpass} ${dockerHub}"
+					//sh "sudo docker login -u ${dockeruser} -p ${dockerpass} ${dockerHub}"
+					sh "echo \"$dockerpass\" | docker login -u \"$dockeruser\" --password-stdin"
   				}
 	    	  	sh 'docker push davidsanchez21/server_minecraft'
 	    	 }
@@ -29,9 +30,15 @@ pipeline {
 		stage("Running Docker Image"){
 			steps{
                 echo 'Running docker image'
-                sshagent(credentials: ['ssh-key-1']) {
-                    sh 'ssh -o StrictHostKeyChecking=no vagrant@192.168.33.11 sudo docker run -d -p 3307:3307 davidsanchez21/server_minecraft'
-				}
+                withCredentials([
+     		 	[$class: 'UsernamePasswordMultiBinding', credentialsId: docker_cred, usernameVariable: 'dockeruser', passwordVariable: 'dockerpass'],
+  				]){
+					//sh "sudo docker login -u ${dockeruser} -p ${dockerpass} ${dockerHub}"
+					sh "echo \"$dockerpass\" | docker login -u \"$dockeruser\" --password-stdin"
+  				}
+                sh 'docker pull davidsanchez21/server_minecraft'
+                sh 'docker run -d -p 3307:3307 davidsanchez21/server_minecraft'
+                
 			}
 		}
     }
